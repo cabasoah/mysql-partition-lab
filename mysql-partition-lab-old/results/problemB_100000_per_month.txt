@@ -1,0 +1,16 @@
+PROBLEM B  (2026-11-11 16:13 UTC)  ~100000 rows per month; account_id=4242, cardholder_id=4242
+Partitioned table has 1360 leaf partitions. Times are the best of 3 runs.
+
+Query                            | Partitions read        | Partitioned  | Plain+index 
+--------------------------------------------------------------------------------------
+account + 1 month                |     1 / 1360  (  0.07%) |       15 ms |        8 ms
+account + 3 years                |    36 / 1360  (  2.64%) |       10 ms |       13 ms
+account only (7 years)           |    85 / 1360  (  6.25%) |       13 ms |        9 ms
+3 years, no account              |   576 / 1360  ( 42.35%) |      942 ms |    24134 ms
+no partition key                 |  1360 / 1360  (100.00%) |     2142 ms |    24040 ms
+DATE_FORMAT on date (pitfall)    |    85 / 1360  (  6.25%) |       13 ms |       10 ms
+cardholder via card (join)       |   576 / 1360  ( 42.35%) |       16 ms |       10 ms
+
+EXPLAIN for 'account + 3 years' on the partitioned table:
+  partitions: p2023_11_p2023_11sp2, p2023_12_p2023_12sp2, p2024_01_p2024_01sp2 ... (36 in total)
+  access type: ref   index used: ix_account_posted   rows estimate: 38

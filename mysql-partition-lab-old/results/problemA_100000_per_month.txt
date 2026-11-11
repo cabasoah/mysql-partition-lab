@@ -1,0 +1,25 @@
+PROBLEM A  (2026-11-11 16:17 UTC)  ~100000 rows per month; purging p2019_11 (100000 rows)
+
+Before:
+  plain table on disk        : 2176.00 MB
+  partitioned table on disk  : 13438.50 MB
+  files for p2019_11       : 16 .ibd files, 160.00 MB
+
+DELETE oldest month (plain)              time    35852 ms | redo log   19.82 MB | binlog    6.27 MB
+    -> 100000 rows deleted
+DROP PARTITION p2019_11 (part)           time     1019 ms | redo log   11.84 MB | binlog    0.00 MB
+
+After:
+  plain table on disk        : 2176.00 MB   (DATA_FREE inside file: 4.00 MB)
+  partitioned table on disk  : 13278.50 MB
+  files left for p2019_11  : 0
+
+EXCHANGE PARTITION (archive instead of destroy) on p2019_12:
+EXCHANGE whole partition                 time       73 ms | redo log    1.61 MB | binlog    0.00 MB
+    -> ERROR 1734 (HY000) at line 1: Subpartitioned table, use subpartition instead of partition
+EXCHANGE p2019_12sp0 out (no validation) time     1622 ms | redo log    1.36 MB | binlog    0.00 MB
+    rows now in archive_tx: 6253 (and p2019_12sp0 is empty)
+swap back WITH validation (6253 rows)    time      398 ms | redo log    0.75 MB | binlog    0.00 MB
+
+Adding next month by splitting p_future:
+REORGANIZE p_future -> p2026_11          time     1205 ms | redo log    5.30 MB | binlog    0.00 MB

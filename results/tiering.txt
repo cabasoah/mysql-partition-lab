@@ -1,0 +1,25 @@
+STORAGE TIERING  (2026-11-11 17:50 UTC)  fast directory = /var/lib/mysql, cheap directory = /cold
+
+1) Create a table with one month placed on the cheap directory from the start:
+   files under /cold/globalcard:
+     tier_demo#p#p2030_01.ibd  (0.23 MB)
+   files under /var/lib/mysql/globalcard:
+     tier_demo#p#p2030_02.ibd  (17.00 MB)
+     tier_demo#p#p2030_03.ibd  (44.00 MB)
+     tier_demo#p#p_future.ibd  (0.12 MB)
+
+2) Move existing months to the cheap directory (REORGANIZE PARTITION ... DATA DIRECTORY):
+move p2030_02 (50000 rows)                   time      298 ms | redo log    8.17 MB | binlog    0.00 MB
+move p2030_03 (200000 rows)                  time      883 ms | redo log   32.18 MB | binlog    0.00 MB
+   files under /cold/globalcard now:
+     tier_demo#p#p2030_01.ibd  (0.23 MB)
+     tier_demo#p#p2030_02.ibd  (14.00 MB)
+     tier_demo#p#p2030_03.ibd  (36.00 MB)
+   files left under /var/lib/mysql/globalcard:
+     tier_demo#p#p_future.ibd  (0.12 MB)
+
+3) Archive tier: exchange a month out to a standalone table, then compress it:
+EXCHANGE p2030_03 out (200000 rows)          time       39 ms | redo log    0.06 MB | binlog    0.00 MB
+compress archive (KEY_BLOCK_SIZE=8)          time     1375 ms | redo log    0.52 MB | binlog    0.00 MB
+   archive table size: 36.00 MB -> 16.00 MB
+   (synthetic rows repeat the same description text, so real data will compress less)

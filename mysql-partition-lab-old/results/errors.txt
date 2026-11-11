@@ -1,0 +1,14 @@
+1) Keep the course primary key (transaction_id) and partition by date:
+ERROR 1503 (HY000) at line 1: A PRIMARY KEY must include all columns in the table's partitioning function (prefixed columns are not considered).
+
+2) Keep a foreign key on a partitioned table:
+ERROR 1506 (HY000) at line 1: Foreign keys are not yet supported in conjunction with partitioning
+
+3) RANGE COLUMNS directly on the TIMESTAMP column transaction_date:
+ERROR 1659 (HY000) at line 1: Field 'transaction_date' is of a not allowed type for this type of partitioning
+
+4) Sub-partition by cardholder_id (the column is not on transaction):
+ERROR 1054 (42S22) at line 1: Unknown column 'cardholder_id' in 'partition function'
+
+5) Subtype table (tx_purchase) referencing the partitioned transaction table:
+ERROR 1506 (HY000) at line 1: Foreign keys are not yet supported in conjunction with partitioning

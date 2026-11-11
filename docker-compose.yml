@@ -1,0 +1,39 @@
+# MySQL 8.4 lab for the CS3543 term paper (Table Partitioning & Storage Architecture) -- version 2
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: gc-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: globalcard
+    ports:
+      - "3307:3306"            # connect from Workbench/DBeaver on localhost:3307 (root / rootpass)
+    # /cold stands in for a second, cheaper disk (used by the tiering test). It has to be writable
+    # by the mysql user and listed in innodb_directories before the server starts.
+    entrypoint: ["bash", "-c", "mkdir -p /cold && chown mysql:mysql /cold && exec docker-entrypoint.sh \"$$@\"", "--"]
+    # Server settings are passed here instead of a .cnf file, because MySQL ignores
+    # world-writable config files and Windows bind mounts often look world-writable.
+    command:
+      - mysqld
+      - --default-time-zone=+00:00
+      - --innodb-buffer-pool-size=1G
+      - --innodb-file-per-table=ON
+      - --innodb-directories=/cold
+      - --log-bin=binlog
+      - --binlog-format=ROW
+      - --max-allowed-packet=256M
+      - --skip-name-resolve
+    volumes:
+      - gcdata:/var/lib/mysql   # data lives in a Docker volume (fast on Windows/Mac)
+      - gccold:/cold            # the "cheap disk"
+      - ./tests:/tests          # test scripts
+      - ./results:/results      # result files appear in ./results on your computer
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-prootpass", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  gcdata:
+  gccold:

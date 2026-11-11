@@ -1,0 +1,18 @@
+MERCHANT SEARCH  (2026-11-11 17:50 UTC)  100000 rows per month; 3201110 purchase rows
+  tx_purchase_idx  : RANGE by month, local index (merchant_id, transaction_date); 84 leaf partitions
+  tx_purchase_hash : RANGE by month + HASH(merchant_id) x 8, same index; 672 leaf partitions
+  Times are the best of 3 runs; 'rows' is the number of rows returned.
+
+Query                      | rows    | Index only: parts / ms | Hash: parts / ms      
+----------------------------------------------------------------------------------------
+small merchant + 1 month   |       1 |      1 of 84         9 ms |      1 of 672        9 ms
+small merchant + 3 years   |      20 |     36 of 84         9 ms |     36 of 672       10 ms
+small merchant only        |      57 |     84 of 84         9 ms |     84 of 672        9 ms
+large merchant + 1 month   |    2098 |      1 of 84        14 ms |      1 of 672       12 ms
+
+Hash skew caused by the large merchant (rows per bucket in p2026_10 of tx_purchase_hash):
+  smallest bucket 4677 rows, largest bucket 6858 rows
+
+A merchant search usually needs the amount, which is on transaction, so it joins back:
+  small merchant + 1 month, joined to transaction_part: EXPLAIN lists 16 of 1344 partitions of transaction_part; 9 ms
+  (MySQL carries the date range across the join, but not account_id, so every bucket of the month is listed)

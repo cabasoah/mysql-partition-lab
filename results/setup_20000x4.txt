@@ -1,0 +1,19 @@
+SETUP  (2026-11-11 17:52 UTC, MySQL 8.4.13, buffer pool 1152.00 MB)
+Rows per month              : 20000
+Rows per table              : 1680000
+Accounts                    : 100000
+Hash buckets per month      : 4
+Leaf partitions (part)      : 340
+.ibd files, plain / part    : 1 / 340
+Plain table  (5 indexes)    : file size 508.00 MB, blocks allocated on disk 508.00 MB
+Partitioned  (4 indexes)    : file size 3024.62 MB, blocks allocated on disk 3025.93 MB
+  smallest / largest .ibd   : 0.15 MB / 9.00 MB
+  data + index pages in use : plain 493.70 MB, partitioned 375.78 MB
+Load time plain             : 30620 ms
+Copy time into partitioned  : 40528 ms
+
+Example partition files for one month:
+  transaction_part#p#p2019_11#sp#p2019_11sp0.ibd
+  transaction_part#p#p2019_11#sp#p2019_11sp1.ibd
+  transaction_part#p#p2019_11#sp#p2019_11sp2.ibd
+  transaction_part#p#p2019_11#sp#p2019_11sp3.ibd

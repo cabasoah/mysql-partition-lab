@@ -1,0 +1,21 @@
+LOCK TEST  (2026-11-11 17:47 UTC)  100000 rows per month
+A second session runs one indexed SELECT and one INSERT for a recent month, over and over,
+while the purge runs. Each probe starts a new client, which is the baseline cost.
+
+Baseline (nothing else running): SELECT median 10 ms, INSERT median 13 ms
+
+1) During DELETE of the two oldest months on the plain table (p2020_02, p2020_03):
+   DELETE ran for 7585 ms; 56 probes completed while it ran
+   recent-month SELECT : median 9 ms, slowest 27 ms
+   recent-month INSERT : median 13 ms, slowest 33 ms
+   INSERT of a row dated inside the range being deleted: waited 7197 ms (started 300 ms after the DELETE)
+
+2) DROP PARTITION p2020_02 while another session has an open transaction on the table:
+   the open transaction held the table for 6000 ms (the DROP was issued 1000 ms into it)
+   DROP PARTITION took 5690 ms in total, most of it waiting for that transaction to end
+   a new SELECT issued while the DROP was waiting took 4016 ms (it queued behind the DROP)
+
+3) DROP PARTITION p2020_03 with no open transactions, probes running:
+   DROP ran for 800 ms; 2 probes completed while it ran
+   recent-month SELECT : median 545 ms, slowest 545 ms
+   recent-month INSERT : median 16 ms, slowest 16 ms

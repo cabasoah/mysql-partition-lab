@@ -1,0 +1,35 @@
+PROBLEM B  (2026-11-11 17:58 UTC)  20000 rows per month, 96 hash buckets per month
+account_id=4242; cardholder_id=4242 owns accounts: 4242,24235
+Partitioned table: 85 range partitions x 96 buckets = 8160 leaf partitions. Times are the best of 3 runs.
+
+Query                            | Partitions read          | Partitioned | Plain      
+----------------------------------------------------------------------------------------
+account + 1 month                |     1 / 8160  (  0.01%) |       12 ms |        9 ms
+account + 3 years                |    36 / 8160  (  0.44%) |        9 ms |       10 ms
+account only (7 years)           |    85 / 8160  (  1.04%) |       11 ms |        9 ms
+3 years, no account              |  3456 / 8160  ( 42.35%) |      203 ms |      394 ms
+no partition key                 |  8160 / 8160  (100.00%) |      460 ms |      389 ms
+DATE_FORMAT on date (pitfall)    |    85 / 8160  (  1.04%) |       15 ms |       12 ms
+cardholder via card (join), 3y   |  3456 / 8160  ( 42.35%) |       26 ms |        9 ms
+cardholder: IN (accounts), 3y    |    72 / 8160  (  0.88%) |       10 ms |        8 ms
+
+Why the times differ: how the plain table is read, and pages read from disk in the last run
+Query                            | Plain table: access type / index   | Disk: part   | Disk: plain 
+--------------------------------------------------------------------------------------------------
+account + 1 month                | range / ix_account_txdate          |      0 pages |      0 pages
+account + 3 years                | range / ix_account_txdate          |      6 pages |      0 pages
+account only (7 years)           | ref / ix_account_posted            |      0 pages |      0 pages
+3 years, no account              | ALL / NULL                         |      0 pages |      0 pages
+no partition key                 | ALL / NULL                         |      0 pages |      0 pages
+DATE_FORMAT on date (pitfall)    | ref / ix_account_posted            |      0 pages |      0 pages
+cardholder via card (join), 3y   | ref / ix_account_txdate            |      0 pages |      0 pages
+cardholder: IN (accounts), 3y    | range / ix_account_txdate          |      0 pages |      0 pages
+
+The 99.9% question, for the 3-year account search:
+  it reads 36 leaf partitions (one bucket in each month of the window), i.e. 0.44% of 8160.
+  to read at most 0.1% of the partitions, the table would need 36000 leaf partitions = 424 buckets per month.
+  MySQL allows 8192 partitions in total, so at most 96 buckets per month with 85 range partitions (best case: 0.44% read).
+
+EXPLAIN for 'account + 3 years' on the partitioned table:
+  partitions: p2023_11_p2023_11sp18, p2023_12_p2023_12sp18, p2024_01_p2024_01sp18 ... (36 in total)
+  access type: ref   index used: ix_account_posted   rows estimate: 7

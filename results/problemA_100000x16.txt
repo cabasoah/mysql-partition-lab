@@ -1,0 +1,55 @@
+PROBLEM A  (2026-11-11 17:44 UTC)  100000 rows per month, 16 hash buckets per month, 1360 leaf partitions
+
+Before:
+  plain table        : file size 2408.00 MB, allocated 2408.00 MB
+  partitioned table  : file size 13439.50 MB, allocated 13444.75 MB
+
+How the DELETE finds its rows (EXPLAIN):
+  access type: range   index used: ix_txdate   rows estimate: 222828
+
+If the DELETE fails part-way (DELETE inside a transaction, then ROLLBACK), month p2019_11:
+  deleted 100000 rows in 14956 ms, then ROLLBACK took 1641 ms
+
+Purging the three oldest months, one at a time:
+run 1  DELETE p2019_11 (plain table)         time     1961 ms | redo log   18.07 MB | binlog    6.27 MB
+    -> 100000 rows deleted
+run 1  DROP PARTITION p2019_11               time      965 ms | redo log   15.43 MB | binlog    0.00 MB
+    -> 16 .ibd files before, 0 after
+run 2  DELETE p2019_12 (plain table)         time     2900 ms | redo log   37.21 MB | binlog    6.27 MB
+    -> 100000 rows deleted
+run 2  DROP PARTITION p2019_12               time      774 ms | redo log    9.76 MB | binlog    0.00 MB
+    -> 16 .ibd files before, 0 after
+run 3  DELETE p2020_01 (plain table)         time     2688 ms | redo log   36.65 MB | binlog    6.27 MB
+    -> 100000 rows deleted
+run 3  DROP PARTITION p2020_01               time      667 ms | redo log    7.83 MB | binlog    0.00 MB
+    -> 16 .ibd files before, 0 after
+
+Median of the three runs:
+  DELETE           time     2688 ms | redo log   36.65 MB | binlog    6.27 MB
+  DROP PARTITION   time      774 ms | redo log    9.76 MB | binlog    0.00 MB
+
+After:
+  plain table        : file size 2408.00 MB, allocated 2408.00 MB   (free space inside the file: 4.00 MB)
+  partitioned table  : file size 12959.50 MB, allocated 12964.56 MB
+
+Getting the DELETEd space back means rebuilding the whole plain table:
+OPTIMIZE TABLE transaction_plain             time    60779 ms | redo log   35.50 MB | binlog    0.00 MB
+  plain table after  : file size 1696.00 MB
+
+EXCHANGE PARTITION (archive instead of destroy) on p2020_02:
+EXCHANGE whole partition p2020_02            time       74 ms | redo log    1.82 MB | binlog    0.00 MB
+    -> ERROR 1734 (HY000) at line 1: Subpartitioned table, use subpartition instead of partition
+EXCHANGE p2020_02sp0 out, no validation      time     1369 ms | redo log    1.24 MB | binlog    0.00 MB
+  swap back WITH validation (6357 rows)      time      557 ms | redo log    0.74 MB | binlog    0.00 MB
+EXCHANGE p2020_02sp1 out, no validation      time      477 ms | redo log    0.75 MB | binlog    0.00 MB
+  swap back WITH validation (6233 rows)      time      362 ms | redo log    0.75 MB | binlog    0.00 MB
+EXCHANGE p2020_02sp2 out, no validation      time      433 ms | redo log    0.74 MB | binlog    0.00 MB
+  swap back WITH validation (6259 rows)      time      417 ms | redo log    0.74 MB | binlog    0.00 MB
+  median: out without validation 477 ms, back with validation 417 ms; a full month needs 16 such statements
+
+Adding the next month by splitting p_future:
+REORGANIZE p_future -> p2026_11 (empty)      time     1204 ms | redo log    4.32 MB | binlog    0.00 MB
+REORGANIZE p_future -> p2026_12 (empty)      time     1154 ms | redo log    5.57 MB | binlog    0.00 MB
+REORGANIZE p_future -> p2027_01 (empty)      time     1140 ms | redo log    5.35 MB | binlog    0.00 MB
+  median of the three: 1154 ms
+REORGANIZE p_future -> p2027_02 (100000 rows) time     2841 ms | redo log   33.39 MB | binlog    0.00 MB

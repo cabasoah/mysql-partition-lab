@@ -1,0 +1,17 @@
+SETUP  (2026-11-11 16:11 UTC, MySQL 8.4.13)
+Rows per month            : 100000
+Rows per table            : 8400000
+Accounts                  : 100000
+Leaf partitions (part)    : 1360
+.ibd files, plain table   : 1
+.ibd files, partitioned   : 1360
+Disk size, plain table    : 2176.00 MB
+Disk size, partitioned    : 13438.50 MB
+Load time plain           : 149686 ms
+Copy time into partitioned: 216237 ms
+
+Example partition files for one month:
+  transaction_part#p#p2019_11#sp#p2019_11sp0.ibd
+  transaction_part#p#p2019_11#sp#p2019_11sp1.ibd
+  transaction_part#p#p2019_11#sp#p2019_11sp2.ibd
+  transaction_part#p#p2019_11#sp#p2019_11sp3.ibd
